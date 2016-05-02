@@ -42,6 +42,7 @@ class NCX:
 
     def head(self):
         head = etree.Element(BASE + 'head')
+        meta = etree.SubElement(head, BASE + 'meta', content='0123456789x', name = 'dtb:uid')
         return head
 
     def nav_map(self):

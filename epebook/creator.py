@@ -3,7 +3,9 @@
 import os
 import re
 import shutil
+import zipfile
 from lxml import etree
+
 import opf
 import ncx
 
@@ -21,6 +23,24 @@ class Creator():
         self.copy_files()
         self.create_ncx()
         self.create_opf()
+
+        epub = zipfile.ZipFile(path, 'w')
+        epub.writestr('mimetype', 'application/epub+zip')
+        epub.write(self.root_dir + '/META-INF/container.xml', 'META-INF/container.xml')
+        epub.write(self.root_dir + '/OEBPS/book.opf', 'OEBPS/book.opf')
+        epub.write(self.root_dir + '/OEBPS/toc.ncx', 'OEBPS/toc.ncx')
+
+        for file in os.listdir(self.root_dir + '/OEBPS/text'):
+            epub.write(self.root_dir + '/OEBPS/text/' + file, 'OEBPS/text/' + file)
+
+        for file in os.listdir(self.root_dir + '/OEBPS/images'):
+            epub.write(self.root_dir + '/OEBPS/images/' + file, 'OEBPS/images/' + file)
+
+        for file in os.listdir(self.root_dir + '/OEBPS/css'):
+            epub.write(self.root_dir + '/OEBPS/css/' + file, 'OEBPS/css/' + file)
+
+        epub.close()
+
 
 
     def create_basic_structure(self):
@@ -46,7 +66,7 @@ class Creator():
         container.write('''<?xml version="1.0"?>
     <container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
         <rootfiles>
-            <rootfile full-path="OEBPS/ebook.opf" media-type="application/oebps-package+xml"/>
+            <rootfile full-path="OEBPS/book.opf" media-type="application/oebps-package+xml"/>
         </rootfiles>
 </container>''')
 
@@ -66,25 +86,25 @@ class Creator():
             filename = re.sub(FILENAME_RE, r'\2', final_file['src'])
             if IMAGES_RE.search(filename):
                 shutil.copy(final_file['src'], self.root_dir + '/OEBPS/images/')
-                final_file['src'] = 'OEBPS/images/' + filename
+                final_file['src'] = 'images/' + filename
                 final_file['id'] = "img_%s" % imgs_counter
                 self.final_files.append(final_file)
                 imgs_counter += 1
             elif TEXT_RE.search(filename):
                 shutil.copy(final_file['src'], self.root_dir + '/OEBPS/text/')
-                final_file['src'] = 'OEBPS/text/' + filename
+                final_file['src'] = 'text/' + filename
                 final_file['navigation'] = True
                 final_file['id'] = "text_%s" % text_counter
                 self.final_files.append(final_file)
                 text_counter += 1
             elif CSS_RE.search(filename):
                 shutil.copy(final_file['src'], self.root_dir + '/OEBPS/css/')
-                final_file['src'] = 'OEBPS/css/' + filename
+                final_file['src'] = 'css/' + filename
                 final_file['id'] = "css_%s" % css_counter
                 self.final_files.append(final_file)
                 css_counter += 1
 
-        self.final_files.append({'src': 'OEBPS/toc.ncx', 'id': 'ncx', 'navigation': False})
+        self.final_files.append({'src': 'toc.ncx', 'id': 'ncx', 'navigation': False})
 
     def create_opf(self):
         opf_creator = opf.OPF()
