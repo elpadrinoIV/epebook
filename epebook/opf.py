@@ -89,9 +89,9 @@ class OPF:
             elif CSS_RE.search(filename):
                 self.css.append(file)
             elif NCX_RE.search(filename):
-                ncx = file
+                self.ncx = file
             else:
-                other.append(file)
+                self.other.append(file)
 
         # Text
         for file in self.text:
@@ -106,13 +106,14 @@ class OPF:
 
         for file in self.images:
             item = etree.SubElement(manifest, BASE + 'item', id = file['id'], href = file['src'])
-            if PNG_RE.match(file):
+
+            if PNG_RE.search(file['src']):
                 item.attrib['media-type'] = 'image/png'
-            elif JPEG_RE.match(file):
+            elif JPEG_RE.search(file['src']):
                 item.attrib['media-type'] = 'image/jpeg'
-            elif GIF_RE.match(file):
+            elif GIF_RE.search(file['src']):
                 item.attrib['media-type'] = 'image/gif'
-            elif SVG_RE.match(file):
+            elif SVG_RE.search(file['src']):
                 item.attrib['media-type'] = 'image/svg+xml'
 
         # CSS
@@ -122,7 +123,7 @@ class OPF:
 
         # NCX
         if self.ncx is not None:
-            item = etree.SubElement(manifest, BASE + 'item', id = file['id'], href = file['src'])
+            item = etree.SubElement(manifest, BASE + 'item', id = self.ncx['id'], href = self.ncx['src'])
             item.attrib['media-type'] = 'application/x-dtbncx+xml'
 
         return manifest

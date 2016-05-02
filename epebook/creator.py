@@ -65,24 +65,24 @@ class Creator():
             final_file = self.__file_with_metadata(file)
             filename = re.sub(FILENAME_RE, r'\2', final_file['src'])
             if IMAGES_RE.search(filename):
-                shutil.copy(file['src'], self.root_dir + '/OEBPS/images/')
+                shutil.copy(final_file['src'], self.root_dir + '/OEBPS/images/')
                 final_file['src'] = 'OEBPS/images/' + filename
                 final_file['id'] = "img_%s" % imgs_counter
                 self.final_files.append(final_file)
                 imgs_counter += 1
             elif TEXT_RE.search(filename):
-                shutil.copy(file['src'], self.root_dir + '/OEBPS/text/')
+                shutil.copy(final_file['src'], self.root_dir + '/OEBPS/text/')
                 final_file['src'] = 'OEBPS/text/' + filename
                 final_file['navigation'] = True
                 final_file['id'] = "text_%s" % text_counter
                 self.final_files.append(final_file)
                 text_counter += 1
             elif CSS_RE.search(filename):
-                shutil.copy(file['src'], self.root_dir + '/OEBPS/css/')
+                shutil.copy(final_file['src'], self.root_dir + '/OEBPS/css/')
                 final_file['src'] = 'OEBPS/css/' + filename
                 final_file['id'] = "css_%s" % css_counter
                 self.final_files.append(final_file)
-                css_counter += 1 
+                css_counter += 1
 
         self.final_files.append({'src': 'OEBPS/toc.ncx', 'id': 'ncx', 'navigation': False})
 
