@@ -1,5 +1,6 @@
 from lxml import etree
 
+import datetime
 import re
 
 BASE_NS = 'http://www.idpf.org/2007/opf'
@@ -15,12 +16,13 @@ NSMAP = {None : BASE_NS}
 NSMAP2 = {'dc' : DC_NS, 'opf' : OPF_NS, 'xsi': XSI_NS}
 
 class OPF:
-    def __init__(self, title='NoTitle', author='NoAuthor', language='en', id=None, creator=None, rights=None, date=None, description=None, publisher=None):
+    def __init__(self, title='NoTitle',  language='en', id=None, id_type = None, rights=None, date=None, description=None, publisher=None):
         self.title = title
-        self.author = author
+        self.authors = []
+        self.contributors = []
         self.language = language
         self.id = id
-        self.creator = creator
+        self.id_type = id_type
         self.rights = rights
         self.date = None
         self.description = description
@@ -30,10 +32,43 @@ class OPF:
         self.images = []
         self.css = []
         self.ncx = None
-        self.other = []
 
     def set_files(self, files):
         self.files = files
+
+    def set_title(self, title):
+        self.title = title
+
+    def set_language(self, language):
+        self.language = language
+
+    def set_id(self, id, id_type):
+        self.id = id
+        self.id_type = id_type
+
+    def add_author(self, author):
+        if type(author) == str:
+            self.authors.append(author)
+        elif type(author) == list:
+            self.authors = self.authors + author
+
+    def add_contributor(self, contributor):
+        if type(contributor) == str:
+            self.contributors.append(contributor)
+        elif type(contributor) == list:
+            self.contributors = self.contributors + contributor
+
+    def set_rights(self, rights):
+        self.rights = rights
+
+    def set_date(self, date):
+        self.date = date
+
+    def set_description(self, description):
+        self.description = description
+
+    def set_publisher(self, publisher):
+        self.publisher = publisher
 
     def write_file(self, path):
         opf_file = open(path, 'w')
@@ -60,14 +95,39 @@ class OPF:
         language = etree.SubElement(metadata, DC + 'language')
         language.text = self.language
 
-        if self.id is None:
-            # TODO: create random ID
-            self.id = '123456789x'
 
         identifier = etree.SubElement(metadata, DC + 'identifier', id='BookId')
-        identifier.attrib[OPF_PFX + 'scheme'] = 'ISBN'
+        identifier.attrib[OPF_PFX + 'scheme'] = self.id_type
         identifier.text = self.id
 
+        for author in self.authors:
+            a = etree.SubElement(metadata, DC + 'creator')
+            a.attrib[OPF_PFX + 'role'] = 'aut'
+            a.text = author
+
+        for contributor in self.contributors:
+            c = etree.SubElement(metadata, DC + 'contributor')
+            c.text = contributor
+
+        if self.rights is not None:
+            rights = etree.SubElement(metadata, DC + 'rights')
+            rights.text = self.rights
+
+        if self.date is not None:
+            if type(self.date) == str:
+                date = etree.SubElement(metadata, DC + 'date')
+                date.text = self.date
+            elif type(self.date) == datetime.datetime:
+                date = etree.SubElement(metadata, DC + 'date')
+                date.text = self.date.strftime("%Y-%m-%d")
+
+        if self.description is not None:
+            description = etree.SubElement(metadata, DC + 'description')
+            description.text = self.description
+
+        if self.publisher is not None:
+            publisher = etree.SubElement(metadata, DC + 'publisher')
+            publisher.text = self.publisher
 
 
         return metadata
@@ -90,8 +150,6 @@ class OPF:
                 self.css.append(file)
             elif NCX_RE.search(filename):
                 self.ncx = file
-            else:
-                self.other.append(file)
 
         # Text
         for file in self.text:

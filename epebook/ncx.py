@@ -12,6 +12,16 @@ class NCX:
         self.title = title
         self.author = author
         self.files = []
+        self.id = None
+
+    def set_title(self, title):
+        self.title = title
+
+    def set_author(self, author):
+        self.author = author
+
+    def set_id(self, id):
+        self.id = id
 
     def set_files(self, files):
         self.files = files
@@ -42,7 +52,7 @@ class NCX:
 
     def head(self):
         head = etree.Element(BASE + 'head')
-        meta = etree.SubElement(head, BASE + 'meta', content='0123456789x', name = 'dtb:uid')
+        meta = etree.SubElement(head, BASE + 'meta', content=self.id, name = 'dtb:uid')
         return head
 
     def nav_map(self):
