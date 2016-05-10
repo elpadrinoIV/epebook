@@ -16,25 +16,43 @@ NSMAP = {None : BASE_NS}
 NSMAP2 = {'dc' : DC_NS, 'opf' : OPF_NS, 'xsi': XSI_NS}
 
 class OPF:
-    def __init__(self, title='NoTitle',  language='en', id=None, id_type = None, rights=None, date=None, description=None, publisher=None):
+    TEXT_RE = re.compile('(\.html|\.xhtml|\.htm)$', re.I)
+    CSS_RE = re.compile('\.css$', re.I)
+    NCX_RE = re.compile('\.ncx$', re.I)
+    JPEG_RE = re.compile('\.jpg$', re.I)
+    PNG_RE = re.compile('\.png$', re.I)
+    GIF_RE = re.compile('\.gif$', re.I)
+    SVG_RE = re.compile('\.svg$', re.I)
+
+    def __init__(self, title='NoTitle',  language='en'):
         self.title = title
         self.authors = []
         self.contributors = []
         self.language = language
-        self.id = id
-        self.id_type = id_type
-        self.rights = rights
+        self.id = None
+        self.id_type = None
+        self.rights = None
         self.date = None
-        self.description = description
-        self.publisher = publisher
+        self.description = None
+        self.publisher = None
+        self.cover_image = None
+        self.cover_page = None
         self.files = []
         self.text = []
         self.images = []
         self.css = []
         self.ncx = None
+        self.toc_page = None
 
     def set_files(self, files):
         self.files = files
+
+    def set_cover(self, cover_image, cover_page):
+        self.cover_image = cover_image
+        self.cover_page = cover_page
+
+    def set_toc_page(self, toc_page):
+        self.toc_page = toc_page
 
     def set_title(self, title):
         self.title = title
@@ -129,12 +147,16 @@ class OPF:
             publisher = etree.SubElement(metadata, DC + 'publisher')
             publisher.text = self.publisher
 
+        if self.cover_image is not None:
+            cover = etree.SubElement(metadata, BASE + 'meta')
+            cover.attrib['name'] = 'cover'
+            cover.attrib['content'] = 'cover'
+
 
         return metadata
 
     def manifest(self):
         manifest = etree.Element(BASE + 'manifest')
-        # <item href="" id="" media-type="">
 
         IMAGES_RE = re.compile('(\.jpg|\.gif|\.png|\.svg)$', re.I)
         TEXT_RE = re.compile('(\.html|\.xhtml|\.htm)$', re.I)
@@ -151,43 +173,48 @@ class OPF:
             elif NCX_RE.search(filename):
                 self.ncx = file
 
+        # Cover
+        if self.cover_image is not None:
+            item = etree.SubElement(manifest, BASE + 'item', id = 'cover', href = self.cover_image)
+            item.attrib['media-type'] = self.__get_media_type(self.cover_image)
+
+        if self.cover_page is not None:
+            item = etree.SubElement(manifest, BASE + 'item', id = self.cover_page['id'], href = self.cover_page['src'])
+            item.attrib['media-type'] = self.__get_media_type(self.cover_page['src'])
+
         # Text
         for file in self.text:
             item = etree.SubElement(manifest, BASE + 'item', id = file['id'], href = file['src'])
-            item.attrib['media-type'] = 'application/xhtml+xml'
+            item.attrib['media-type'] = self.__get_media_type(file['src'])
 
         # Images
-        PNG_RE = re.compile('\.png$', re.I)
-        JPEG_RE = re.compile('\.jpg$', re.I)
-        GIF_RE = re.compile('\.gif$', re.I)
-        SVG_RE = re.compile('\.svg$', re.I)
-
         for file in self.images:
             item = etree.SubElement(manifest, BASE + 'item', id = file['id'], href = file['src'])
-
-            if PNG_RE.search(file['src']):
-                item.attrib['media-type'] = 'image/png'
-            elif JPEG_RE.search(file['src']):
-                item.attrib['media-type'] = 'image/jpeg'
-            elif GIF_RE.search(file['src']):
-                item.attrib['media-type'] = 'image/gif'
-            elif SVG_RE.search(file['src']):
-                item.attrib['media-type'] = 'image/svg+xml'
+            item.attrib['media-type'] = self.__get_media_type(file['src'])
 
         # CSS
         for file in self.css:
             item = etree.SubElement(manifest, BASE + 'item', id = file['id'], href = file['src'])
-            item.attrib['media-type'] = 'text/css'
+            item.attrib['media-type'] = self.__get_media_type(file['src'])
 
         # NCX
         if self.ncx is not None:
             item = etree.SubElement(manifest, BASE + 'item', id = self.ncx['id'], href = self.ncx['src'])
-            item.attrib['media-type'] = 'application/x-dtbncx+xml'
+            item.attrib['media-type'] = self.__get_media_type(self.ncx['src'])
+
+        # TOC page
+        if self.toc_page is not None:
+            item = etree.SubElement(manifest, BASE + 'item', id = self.toc_page['id'], href = self.toc_page['src'])
+            item.attrib['media-type'] = self.__get_media_type(self.toc_page['src'])
 
         return manifest
 
     def spine(self):
         spine = etree.Element(BASE + 'spine', toc='ncx')
+
+        if self.toc_page is not None:
+            itemref = etree.SubElement(spine, BASE + 'itemref', idref = self.toc_page['id'])
+
         for file in self.text:
             itemref = etree.SubElement(spine, BASE + 'itemref', idref = file['id'])
 
@@ -195,6 +222,30 @@ class OPF:
 
     def guide(self):
         guide = etree.Element(BASE + 'guide')
+
+        if self.cover_page is not None:
+            reference = etree.SubElement(guide, BASE + 'reference', type = 'cover', title = 'Cover', href = self.cover_page['src'])
+
+        if self.toc_page is not None:
+            reference = etree.SubElement(guide, BASE + 'reference', type = 'toc', title = 'Table of contents', href = self.toc_page['src'])
+
         return guide
 
+    def __get_media_type(self, filename):
 
+        if self.TEXT_RE.search(filename):
+            return 'application/xhtml+xml'
+        elif self.CSS_RE.search(filename):
+            return 'text/css'
+        elif self.NCX_RE.search(filename):
+            return 'application/x-dtbncx+xml'
+        elif self.JPEG_RE.search(filename):
+            return 'image/jpeg'
+        elif self.PNG_RE.search(filename):
+            return 'image/png'
+        elif self.GIF_RE.search(filename):
+            return 'image/gif'
+        elif self.SVG_RE.search(filename):
+            return 'image/svg+xml'
+        else:
+            return 'unknown'

@@ -18,6 +18,12 @@ class Creator():
     TEXT_RE = re.compile('(\.html|\.xhtml|\.htm)$', re.I)
     CSS_RE = re.compile('\.css$', re.I)
 
+    BASE_XHTML_NS = 'http://www.w3.org/1999/xhtml'
+
+    BASE_XHTML = "{%s}" % BASE_XHTML_NS
+
+    NSMAP = {None : BASE_XHTML_NS}
+
     def __init__(self):
         self.root_dir = 'ebook_root'
         self.original_files = []
@@ -31,9 +37,17 @@ class Creator():
         self.id = None
         self.id_type = None
         self.publisher = None
+        self.cover = None
+        self.final_cover_image = None
+        self.final_cover_page = None
+        self.toc_page = None
+        self.create_toc = True
 
     def set_files(self, files):
         self.original_files = files
+
+    def set_cover(self, cover):
+        self.cover = cover
 
     def set_title(self, title):
         self.title = title
@@ -63,7 +77,8 @@ class Creator():
     def set_publisher(self, publisher):
         self.publisher = publisher
 
-    def create(self, path):
+    def create(self, path, create_toc = True):
+        self.create_toc = create_toc
         self.create_basic_structure()
         self.copy_files()
 
@@ -128,6 +143,12 @@ class Creator():
         imgs_counter = 1
         text_counter = 1
         css_counter = 1
+        if self.cover is not None:
+            filename = re.sub(self.FILENAME_RE, r'\2', self.cover)
+            shutil.copy(self.cover, self.root_dir + '/OEBPS/images/')
+            self.final_cover_image = 'images/' + filename
+            self.final_cover_page = self.__create_cover_page()
+
         for file in self.original_files:
             final_file = self.__file_with_metadata(file)
             filename = re.sub(self.FILENAME_RE, r'\2', final_file['src'])
@@ -151,6 +172,9 @@ class Creator():
                 self.final_files.append(final_file)
                 css_counter += 1
 
+        if self.create_toc:
+            self.toc_page = self.__create_toc_page()
+
         self.final_files.append({'src': 'toc.ncx', 'id': 'ncx', 'navigation': False})
 
     def create_opf(self):
@@ -164,6 +188,8 @@ class Creator():
         opf_creator.set_id(self.id, self.id_type)
         opf_creator.set_publisher(self.publisher)
 
+        opf_creator.set_cover(self.final_cover_image, self.final_cover_page)
+        opf_creator.set_toc_page(self.toc_page)
         opf_creator.set_files(self.final_files)
         opf_creator.write_file(self.root_dir + '/OEBPS/book.opf')
 
@@ -214,3 +240,76 @@ class Creator():
 
 
         return nav_label
+
+    def __create_basic_page(self):
+        root = etree.Element(self.BASE_XHTML + "html")
+        root.attrib['xmlns'] = self.BASE_XHTML_NS
+
+        head = etree.SubElement(root, 'head')
+
+        body = etree.SubElement(root, 'body')
+
+        return root
+
+    def __create_cover_page(self):
+        if self.final_cover_image is None:
+            return None
+
+        page = self.__create_basic_page()
+        head = page.xpath('//head')[0]
+        title = etree.SubElement(head, 'title')
+        title.text = 'Cover'
+
+        body = page.xpath('//body')[0]
+
+        div = etree.SubElement(body, 'div')
+
+        img = etree.SubElement(div, 'img')
+        img.attrib['src'] = '../' + self.final_cover_image
+        img.attrib['alt'] = 'Cover'
+
+        file = open(self.root_dir + '/OEBPS/text/cover.xhtml', 'wb')
+        file.write(etree.tostring(page, pretty_print=True, encoding='UTF-8', xml_declaration=True))
+        file.close
+
+        final_file = {
+                'src': 'text/cover.xhtml',
+                'navigation': False,
+                'id': 'page-cover'}
+
+        return final_file
+
+    def __create_toc_page(self):
+        page = self.__create_basic_page()
+        head = page.xpath('//head')[0]
+        title = etree.SubElement(head, 'title')
+        title.text = 'Table of contents'
+
+        body = page.xpath('//body')[0]
+
+        h = etree.SubElement(body, 'h1')
+        h.text = 'Contents'
+
+        list = etree.SubElement(body, 'ul')
+
+        for file in self.final_files:
+            filename = re.sub(self.FILENAME_RE, r'\2', file['src'])
+
+            li = etree.SubElement(list, 'li')
+            link = etree.SubElement(li, 'a')
+            link.attrib['href'] = filename
+            link.text = file['nav_label']
+
+
+        file = open(self.root_dir + '/OEBPS/text/toc.xhtml', 'wb')
+        file.write(etree.tostring(page, pretty_print=True, encoding='UTF-8', xml_declaration=True))
+        file.close
+
+        final_file = {
+                'src': 'text/toc.xhtml',
+                'navigation': True,
+                'class': 'other',
+                'nav_label': 'Table of contents',
+                'id': 'page-toc'}
+
+        return final_file
